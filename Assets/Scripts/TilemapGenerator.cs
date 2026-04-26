@@ -1,3 +1,4 @@
+using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -16,7 +17,7 @@ public class TilemapGenerator : MonoBehaviour
     void Start() => Generate();
 
 
-
+    [Button]
     public void Generate()
     {
         tilemap.ClearAllTiles();
@@ -37,18 +38,34 @@ public class TilemapGenerator : MonoBehaviour
             newRoom.roomType = RoomType.simple;
 
             bool foundRoom = false;
-            while (!foundRoom)
+
+            int maxAttempts = 100;
+            int attempts = 0;
+
+            while (!foundRoom && attempts < maxAttempts)
             {
+                
                 int randX = Random.Range(0, width);
                 int randY = Random.Range(0, height);
-                Vector2 newPos = new Vector2(randX, randY);
+                newRoom.pos = new Vector2Int(randX, randY);
                 int randSize = Random.Range(0, 4);
                 newRoom.roomSizeX = averageRoomSize + randSize;
                 newRoom.roomSizeY = averageRoomSize - randSize;
                 foundRoom = CheckIfRoomFit(newRoom);
+                attempts++;
+
             }
 
-            BuildRoom(newRoom);
+            if (!foundRoom)
+            {
+                Debug.LogWarning($"Room {i} could not be placed after {maxAttempts} attempts, skipping.");
+                break;
+            }
+            else
+            {
+                BuildRoom(newRoom);
+
+            }
         }
 
 
