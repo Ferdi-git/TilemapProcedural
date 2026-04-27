@@ -5,7 +5,7 @@ using UnityEngine.Tilemaps;
 public class TilemapGenerator : MonoBehaviour
 {
     public Tilemap tilemap;
-    public Tile UncheckedTile,CheckedTile;
+    public Tile[] tiles;
 
     public int width = 80;
     public int height = 40;
@@ -21,7 +21,7 @@ public class TilemapGenerator : MonoBehaviour
     public void Generate()
     {
         tilemap.ClearAllTiles();
-        Vector2 offset = new Vector2(seed, seed);
+
 
         // Grid Created
         for (int x = 0; x < width; x++)
