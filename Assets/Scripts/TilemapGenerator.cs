@@ -4,117 +4,60 @@ using UnityEngine.Tilemaps;
 
 public class TilemapGenerator : MonoBehaviour
 {
+    [SerializeField] SONoiseSettings noiseSettings;
+
     public Tilemap tilemap;
     public Tile[] tiles;
-
-    public int width = 80;
-    public int height = 40;
+    public int widthX = 80;
+    public int heightY = 40;
     public int numberOfRooms = 2;
     public int seed;
-
+    public float scale = 0.05f;
     public int averageRoomSize = 5;
 
     void Start() => Generate();
 
-
+    private void OnValidate()
+    {
+        Generate();
+    }
     [Button]
     public void Generate()
     {
+        Random.InitState(seed);
+        int offset = Random.Range(0, 10000);
+        noiseSettings.offset = offset;
+
         tilemap.ClearAllTiles();
 
-
-        // Grid Created
-        for (int x = 0; x < width; x++)
-            for (int y = 0; y < height; y++)
+        for (int x = 0; x < widthX; x++)
+            for (int y = 0; y < heightY; y++)
             {
-                TileBase tile = UncheckedTile;
+                float height = PerlinNoise.GetHeight(new Vector2Int(x, y), noiseSettings);
+                TileBase tile = GetCorrespondingTile(height);
                 tilemap.SetTile(new Vector3Int(x, y, 0), tile);
             }
-        
-        for(int i = 0 ; i < numberOfRooms; i++)
-        {
-            RoomData newRoom = new RoomData();
-            newRoom.roomId = i;
-            newRoom.roomType = RoomType.simple;
-
-            bool foundRoom = false;
-
-            int maxAttempts = 100;
-            int attempts = 0;
-
-            while (!foundRoom && attempts < maxAttempts)
-            {
-                
-                int randX = Random.Range(0, width);
-                int randY = Random.Range(0, height);
-                newRoom.pos = new Vector2Int(randX, randY);
-                int randSize = Random.Range(0, 4);
-                newRoom.roomSizeX = averageRoomSize + randSize;
-                newRoom.roomSizeY = averageRoomSize - randSize;
-                foundRoom = CheckIfRoomFit(newRoom);
-                attempts++;
-
-            }
-
-            if (!foundRoom)
-            {
-                Debug.LogWarning($"Room {i} could not be placed after {maxAttempts} attempts, skipping.");
-                break;
-            }
-            else
-            {
-                BuildRoom(newRoom);
-
-            }
-        }
-
-
     }
 
-
-    private bool CheckIfRoomFit(RoomData roomData)
+    private Tile GetCorrespondingTile(float noiseValue)
     {
-        for (int x = 0; x < roomData.roomSizeX; x ++)
-        {
-            for (int y = 0; y < roomData.roomSizeY; y++)
-            {
-                Vector3Int newPosTile = new Vector3Int(roomData.pos.x + x, roomData.pos.y + y,0);
-                if (tilemap.GetTile(newPosTile) != UncheckedTile)
-                {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    private void BuildRoom(RoomData roomData)
-    {
-        for (int x = 0; x < roomData.roomSizeX; x++)
-        {
-            for (int y = 0; y < roomData.roomSizeY; y++)
-            {
-                Vector3Int newPosTile = new Vector3Int(roomData.pos.x + x, roomData.pos.y + y, 0);
-                tilemap.SetTile(newPosTile, CheckedTile);
-            }
-        }
+        int index = Mathf.Clamp(Mathf.FloorToInt(noiseValue * tiles.Length), 0, tiles.Length - 1);
+        return tiles[index];
     }
 }
 
 public class RoomData
 {
-    public int roomId; 
+    public int roomId;
     public int roomSizeX;
     public int roomSizeY;
     public Vector2Int pos;
     public RoomType roomType;
-
 }
+
 public enum RoomType
 {
     simple,
     startVillage,
     end
 }
-
