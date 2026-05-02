@@ -1,17 +1,22 @@
 using Sirenix.OdinInspector;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
 public class TilemapGenerator : MonoBehaviour
 {
     [SerializeField] SONoiseSettings noiseSettings;
+    [SerializeField] SONoiseSettings treeNoiseSettings;
 
     public Tilemap baseTilemap;
     public Tilemap biomeTilemap;
+    public Tilemap treesTilemap;
 
     public Tile Grass;
     public Tile Water;
     public Tile Forest;
+    public Tile UpTree;
+    public Tile DownTree;
 
     public Tile[] grassCornerTiles;
     public Tile[] grassTiles;
@@ -24,6 +29,7 @@ public class TilemapGenerator : MonoBehaviour
 
     public float limitWater = 0.4f;
     public float limitForest = 0.4f;
+    public float limitTree = 0.4f;
 
     private TileBase[,] biomeSnapshot;
 
@@ -46,6 +52,16 @@ public class TilemapGenerator : MonoBehaviour
         noiseSettings.offsetY = Random.Range(0, 10000);
 
         GenerateBiomeTilemap();
+
+        CleanBiomeTilemap();
+
+        treeNoiseSettings.offsetX = Random.Range(0, 10000);
+        treeNoiseSettings.offsetY = Random.Range(0, 10000);
+
+        GenerateTrees();
+
+
+
     }
 
     private void GenerateBaseTilemap()
@@ -86,12 +102,34 @@ public class TilemapGenerator : MonoBehaviour
                 biomeSnapshot[x, y] = tile; 
                 biomeTilemap.SetTile(new Vector3Int(x, y), tile);
             }
+
+    }
+    private void CleanBiomeTilemap()
+    {
         for (int i = 0; i < 3; i++)
         {
             for (int x = 0; x < widthX; x++)
                 for (int y = 0; y < heightY; y++)
                     ApplyForestAutoTile(x, y);
         }
+    }
+
+    private void GenerateTrees()
+    {
+        treesTilemap.ClearAllTiles();
+
+        for (int x = 0; x < widthX; x++)
+            for (int y = 0; y < heightY; y++)
+            {
+                float height = PerlinNoise.GetHeight(new Vector2Int(x, y), treeNoiseSettings);
+                if (height < limitTree && treesTilemap.GetTile(new Vector3Int(x, y)) == null && treesTilemap.GetTile(new Vector3Int(x, y+1)) == null && ( !forestCornerTiles.Contains(biomeTilemap.GetTile(new Vector3Int(x, y))) && biomeTilemap.GetTile(new Vector3Int(x, y)) == Forest))
+                {
+                    treesTilemap.SetTile(new Vector3Int(x, y + 1), UpTree);
+                    treesTilemap.SetTile(new Vector3Int(x, y), DownTree);
+                }
+
+            }
+
     }
 
     private void ApplyBaseAutoTile(int x, int y)
