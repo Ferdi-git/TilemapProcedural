@@ -4,117 +4,216 @@ using UnityEngine.Tilemaps;
 
 public class TilemapGenerator : MonoBehaviour
 {
-    public Tilemap tilemap;
-    public Tile UncheckedTile,CheckedTile;
+    [SerializeField] SONoiseSettings noiseSettings;
 
-    public int width = 80;
-    public int height = 40;
-    public int numberOfRooms = 2;
+    public Tilemap baseTilemap;
+    public Tilemap biomeTilemap;
+
+    public Tile Grass;
+    public Tile Water;
+    public Tile Forest;
+
+    public Tile[] grassCornerTiles;
+    public Tile[] grassTiles;
+    public Tile[] forestCornerTiles;
+    public Tile[] waterTiles;
+
+    public int widthX = 80;
+    public int heightY = 40;
     public int seed;
 
-    public int averageRoomSize = 5;
+    public float limitWater = 0.4f;
+    public float limitForest = 0.4f;
 
-    void Start() => Generate();
+    private TileBase[,] biomeSnapshot;
 
+    private void OnValidate()
+    {
+        Generate();
+    }
 
     [Button]
     public void Generate()
     {
-        tilemap.ClearAllTiles();
-        Vector2 offset = new Vector2(seed, seed);
+        Random.InitState(seed);
 
-        // Grid Created
-        for (int x = 0; x < width; x++)
-            for (int y = 0; y < height; y++)
-            {
-                TileBase tile = UncheckedTile;
-                tilemap.SetTile(new Vector3Int(x, y, 0), tile);
-            }
-        
-        for(int i = 0 ; i < numberOfRooms; i++)
-        {
-            RoomData newRoom = new RoomData();
-            newRoom.roomId = i;
-            newRoom.roomType = RoomType.simple;
+        noiseSettings.offsetX = Random.Range(0, 10000);
+        noiseSettings.offsetY = Random.Range(0, 10000);
 
-            bool foundRoom = false;
+        GenerateBaseTilemap();
 
-            int maxAttempts = 100;
-            int attempts = 0;
+        noiseSettings.offsetX = Random.Range(0, 10000);
+        noiseSettings.offsetY = Random.Range(0, 10000);
 
-            while (!foundRoom && attempts < maxAttempts)
-            {
-                
-                int randX = Random.Range(0, width);
-                int randY = Random.Range(0, height);
-                newRoom.pos = new Vector2Int(randX, randY);
-                int randSize = Random.Range(0, 4);
-                newRoom.roomSizeX = averageRoomSize + randSize;
-                newRoom.roomSizeY = averageRoomSize - randSize;
-                foundRoom = CheckIfRoomFit(newRoom);
-                attempts++;
-
-            }
-
-            if (!foundRoom)
-            {
-                Debug.LogWarning($"Room {i} could not be placed after {maxAttempts} attempts, skipping.");
-                break;
-            }
-            else
-            {
-                BuildRoom(newRoom);
-
-            }
-        }
-
-
+        GenerateBiomeTilemap();
     }
 
-
-    private bool CheckIfRoomFit(RoomData roomData)
+    private void GenerateBaseTilemap()
     {
-        for (int x = 0; x < roomData.roomSizeX; x ++)
-        {
-            for (int y = 0; y < roomData.roomSizeY; y++)
-            {
-                Vector3Int newPosTile = new Vector3Int(roomData.pos.x + x, roomData.pos.y + y,0);
-                if (tilemap.GetTile(newPosTile) != UncheckedTile)
-                {
-                    return false;
-                }
-            }
-        }
+        baseTilemap.ClearAllTiles();
 
-        return true;
+        for (int x = 0; x < widthX; x++)
+            for (int y = 0; y < heightY; y++)
+            {
+                float height = PerlinNoise.GetHeight(new Vector2Int(x, y), noiseSettings);
+                TileBase tile = GetCorrespondingBaseTile(height);
+                baseTilemap.SetTile(new Vector3Int(x, y), tile);
+            }
+
+        for (int i = 0; i < 3; i++)
+        {
+            for (int x = 0; x < widthX; x++)
+                for (int y = 0; y < heightY; y++)
+                    ApplyBaseAutoTile(x, y);
+        }
     }
 
-    private void BuildRoom(RoomData roomData)
+    private void GenerateBiomeTilemap()
     {
-        for (int x = 0; x < roomData.roomSizeX; x++)
-        {
-            for (int y = 0; y < roomData.roomSizeY; y++)
+        biomeTilemap.ClearAllTiles();
+
+        biomeSnapshot = new TileBase[widthX, heightY];
+
+        for (int x = 0; x < widthX; x++)
+            for (int y = 0; y < heightY; y++)
             {
-                Vector3Int newPosTile = new Vector3Int(roomData.pos.x + x, roomData.pos.y + y, 0);
-                tilemap.SetTile(newPosTile, CheckedTile);
+                if (baseTilemap.GetTile(new Vector3Int(x, y)) != Grass)
+                    continue;
+
+                float height = PerlinNoise.GetHeight(new Vector2Int(x, y), noiseSettings);
+                TileBase tile = GetCorrespondingBiomeTile(height);
+
+                biomeSnapshot[x, y] = tile; 
+                biomeTilemap.SetTile(new Vector3Int(x, y), tile);
             }
+        for (int i = 0; i < 3; i++)
+        {
+            for (int x = 0; x < widthX; x++)
+                for (int y = 0; y < heightY; y++)
+                    ApplyForestAutoTile(x, y);
         }
     }
-}
 
-public class RoomData
-{
-    public int roomId; 
-    public int roomSizeX;
-    public int roomSizeY;
-    public Vector2Int pos;
-    public RoomType roomType;
+    private void ApplyBaseAutoTile(int x, int y)
+    {
+        Tile tile = CheckGrassWaterCorners(new Vector2Int(x, y));
 
-}
-public enum RoomType
-{
-    simple,
-    startVillage,
-    end
-}
+        if (tile != null)
+            baseTilemap.SetTile(new Vector3Int(x, y), tile);
+    }
 
+    private Tile GetCorrespondingBaseTile(float noiseValue)
+    {
+        return noiseValue < limitWater ? Water : Grass;
+    }
+
+    private Tile GetCorrespondingBiomeTile(float noiseValue)
+    {
+        return noiseValue < limitForest ? null : Forest;
+    }
+
+    // ---------------- WATER CHECK ----------------
+    private bool IsWater(int x, int y)
+    {
+        return baseTilemap.GetTile(new Vector3Int(x, y)) != Grass;
+    }
+
+    // ---------------- WATER/GRASS AUTOTILE ----------------
+    private Tile CheckGrassWaterCorners(Vector2Int pos)
+    {
+        TileBase current = baseTilemap.GetTile(new Vector3Int(pos.x, pos.y));
+
+        if (current == Grass)
+            return null;
+
+        bool n = !IsWater(pos.x, pos.y + 1);
+        bool s = !IsWater(pos.x, pos.y - 1);
+        bool e = !IsWater(pos.x + 1, pos.y);
+        bool w = !IsWater(pos.x - 1, pos.y);
+
+        bool ne = !IsWater(pos.x + 1, pos.y + 1);
+        bool nw = !IsWater(pos.x - 1, pos.y + 1);
+        bool se = !IsWater(pos.x + 1, pos.y - 1);
+        bool sw = !IsWater(pos.x - 1, pos.y - 1);
+
+        int mask = (n ? 1 : 0) | (s ? 2 : 0) | (e ? 4 : 0) | (w ? 8 : 0);
+
+        if (!n && !s && !e && !w)
+        {
+            if (ne) return grassCornerTiles[8];
+            if (nw) return grassCornerTiles[9];
+            if (se) return grassCornerTiles[10];
+            if (sw) return grassCornerTiles[11];
+        }
+
+        return mask switch
+        {
+            0b0001 => grassCornerTiles[0],
+            0b0010 => grassCornerTiles[1],
+            0b0100 => grassCornerTiles[2],
+            0b1000 => grassCornerTiles[3],
+
+            0b0101 => grassCornerTiles[4],
+            0b1001 => grassCornerTiles[5],
+            0b0110 => grassCornerTiles[6],
+            0b1010 => grassCornerTiles[7],
+
+            0 => Water,
+            _ => Grass
+        };
+    }
+
+    private void ApplyForestAutoTile(int x, int y)
+    {
+        Vector3Int pos = new Vector3Int(x, y);
+
+        if (biomeSnapshot[x, y] != Forest)
+            return;
+
+        bool n = !IsForest(x, y + 1);
+        bool s = !IsForest(x, y - 1);
+        bool e = !IsForest(x + 1, y);
+        bool w = !IsForest(x - 1, y);
+
+        bool ne = !IsForest(x + 1, y + 1);
+        bool nw = !IsForest(x - 1, y + 1);
+        bool se = !IsForest(x + 1, y - 1);
+        bool sw = !IsForest(x - 1, y - 1);
+
+        int mask = (n ? 1 : 0) | (s ? 2 : 0) | (e ? 4 : 0) | (w ? 8 : 0);
+
+        if (!n && !s && !e && !w)
+        {
+            if (ne) biomeTilemap.SetTile(pos, forestCornerTiles[8]);
+            if (nw) biomeTilemap.SetTile(pos, forestCornerTiles[9]);
+            if (se) biomeTilemap.SetTile(pos, forestCornerTiles[10]);
+            if (sw) biomeTilemap.SetTile(pos, forestCornerTiles[11]);
+            return;
+        }
+
+        Tile tile = mask switch
+        {
+            0b0001 => forestCornerTiles[0],
+            0b0010 => forestCornerTiles[1],
+            0b0100 => forestCornerTiles[2],
+            0b1000 => forestCornerTiles[3],
+
+            0b0101 => forestCornerTiles[4],
+            0b1001 => forestCornerTiles[5],
+            0b0110 => forestCornerTiles[6],
+            0b1010 => forestCornerTiles[7],
+
+            _ => null
+        };
+
+        biomeTilemap.SetTile(pos, tile);
+    }
+
+    private bool IsForest(int x, int y)
+    {
+        if (x < 0 || x >= widthX || y < 0 || y >= heightY)
+            return false;
+
+        return biomeSnapshot[x, y] == Forest;
+    }
+}
