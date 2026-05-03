@@ -1,4 +1,5 @@
 using Sirenix.OdinInspector;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -8,35 +9,64 @@ public class TilemapGenerator : MonoBehaviour
     [SerializeField] SONoiseSettings noiseSettings;
     [SerializeField] SONoiseSettings treeNoiseSettings;
 
-    public Tilemap baseTilemap;
-    public Tilemap biomeTilemap;
-    public Tilemap treesTilemap;
-
-    public Tile Grass;
-    public Tile Water;
-    public Tile Forest;
-    public Tile UpTree;
-    public Tile DownTree;
-
-    public Tile[] grassCornerTiles;
-    public Tile[] grassTiles;
-    public Tile[] forestCornerTiles;
-    public Tile[] waterTiles;
-
     public int widthX = 80;
     public int heightY = 40;
     public int seed;
 
+    [Header("Village")]
+
+    public int numberTentVillage = 3;
+    public float minTentDistance = 5f;
+    public float maxTentDistance = 15f;
+
+    [Header("Tilemap")]
+
+    public Tilemap baseTilemap;
+    public Tilemap baseWaterTilemap;
+    public Tilemap biomeTilemap;
+    public Tilemap decorTilemap;
+    public Tilemap buildingsTilemap;
+
+    public Tile Grass;
+    public Tile Water;
+    public Tile Forest;
+    public Tile[] UpTree;
+    public Tile[] DownTree;
+    public Tile[] GrassFlowers;
+    public Tile[] WaterDecor;
+    public Tile[] ForestDecor;
+    public GameObject[] TentsVillage;
+
+
+    public Tile[] grassCornerTiles;
+    public Tile[] forestCornerTiles;
+
+    public Tile[] grassTiles;
+    public Tile[] waterTiles;
+
+
+    [Header("Limits")]
+
     public float limitWater = 0.4f;
     public float limitForest = 0.4f;
-    public float limitTree = 0.4f;
+
+    public float[] limitTrees;
+
+    public float[] limitGrassFlowers;
+
+    public float[] limitWaterDecor;
+
+    public float limitForestDecor;
 
     private TileBase[,] biomeSnapshot;
+
+    private List<Vector3Int> placedTentPositions = new List<Vector3Int>();
 
     private void OnValidate()
     {
         Generate();
     }
+
 
     [Button]
     public void Generate()
@@ -58,22 +88,32 @@ public class TilemapGenerator : MonoBehaviour
         treeNoiseSettings.offsetX = Random.Range(0, 10000);
         treeNoiseSettings.offsetY = Random.Range(0, 10000);
 
-        GenerateTrees();
+        GenerateTreesAndFlower();
 
 
-
+        GenerateVillage();
     }
 
     private void GenerateBaseTilemap()
     {
         baseTilemap.ClearAllTiles();
+        baseWaterTilemap.ClearAllTiles();
 
         for (int x = 0; x < widthX; x++)
             for (int y = 0; y < heightY; y++)
             {
                 float height = PerlinNoise.GetHeight(new Vector2Int(x, y), noiseSettings);
                 TileBase tile = GetCorrespondingBaseTile(height);
-                baseTilemap.SetTile(new Vector3Int(x, y), tile);
+
+                if(tile == Water)
+                {
+                    baseWaterTilemap.SetTile(new Vector3Int(x, y), tile);
+
+                }
+                else
+                {
+                    baseTilemap.SetTile(new Vector3Int(x, y), tile);
+                }
             }
 
         for (int i = 0; i < 3; i++)
@@ -114,30 +154,91 @@ public class TilemapGenerator : MonoBehaviour
         }
     }
 
-    private void GenerateTrees()
+    private void GenerateTreesAndFlower()
     {
-        treesTilemap.ClearAllTiles();
+        decorTilemap.ClearAllTiles();
 
         for (int x = 0; x < widthX; x++)
             for (int y = 0; y < heightY; y++)
             {
+                Vector3Int basePos = new Vector3Int(x, y);
+
                 float height = PerlinNoise.GetHeight(new Vector2Int(x, y), treeNoiseSettings);
-                if (height < limitTree && treesTilemap.GetTile(new Vector3Int(x, y)) == null && treesTilemap.GetTile(new Vector3Int(x, y+1)) == null && ( !forestCornerTiles.Contains(biomeTilemap.GetTile(new Vector3Int(x, y))) && biomeTilemap.GetTile(new Vector3Int(x, y)) == Forest))
+
+                for (int i = 0; limitTrees.Length > i; i++)
                 {
-                    treesTilemap.SetTile(new Vector3Int(x, y + 1), UpTree);
-                    treesTilemap.SetTile(new Vector3Int(x, y), DownTree);
+                    SetTrees(height, UpTree[i], DownTree[i], limitTrees[i], basePos);
+
+                }
+
+                for (int i = 0; limitGrassFlowers.Length > i; i++)
+                {
+                    SetDecor(height, GrassFlowers[i], limitGrassFlowers[i], basePos);
+
+                }
+
+                SetForestDecor(height, limitForestDecor, basePos);
+                
+
+                for (int i = 0; limitWaterDecor.Length > i; i++)
+                {
+                    SetWaterDecor(height, WaterDecor[i], limitWaterDecor[i], basePos);
                 }
 
             }
 
     }
 
+
+    private void SetTrees(float height, Tile tileToPutUp, Tile tileToPutDown, float limitToUse, Vector3Int pos)
+    {  
+        if (height < limitToUse && decorTilemap.GetTile(pos) == null && decorTilemap.GetTile(new Vector3Int(pos.x, pos.y + 1)) == null && (!forestCornerTiles.Contains(biomeTilemap.GetTile(pos)) && biomeTilemap.GetTile(pos) == Forest))
+        {
+            decorTilemap.SetTile(new Vector3Int(pos.x, pos.y + 1), tileToPutUp);
+            decorTilemap.SetTile(pos, tileToPutDown);
+        }
+    }
+
+    private void SetDecor(float height, Tile tileToPut, float limitToUse, Vector3Int pos)
+    {
+        TileBase currentBiomeTile = biomeTilemap.GetTile(pos);
+        TileBase currentBaseTile = baseTilemap.GetTile(pos);
+        if (height < limitToUse && currentBaseTile != null && (currentBiomeTile != Forest && !grassCornerTiles.Contains(currentBaseTile) && !forestCornerTiles.Contains(currentBiomeTile) && baseTilemap.GetTile(pos) != Water))
+        {
+            decorTilemap.SetTile(pos, tileToPut);
+        }
+    }
+
+    private void SetForestDecor(float height, float limitToUse, Vector3Int pos)
+    {
+        TileBase currentBiomeTile = biomeTilemap.GetTile(pos);
+        TileBase currentBaseTile = baseTilemap.GetTile(pos);
+        TileBase currentDecorTile = decorTilemap.GetTile(pos);
+        if (height < limitToUse && currentDecorTile == null && (currentBiomeTile == Forest || forestCornerTiles.Contains(currentBaseTile)))
+        {
+            int randInt = Random.Range(0,ForestDecor.Length);
+            decorTilemap.SetTile(pos, ForestDecor[randInt]);
+        }
+    }
+
+
+    private void SetWaterDecor(float height, Tile tileToPut, float limitToUse, Vector3Int pos)
+    {
+        TileBase currentWaterTile = baseWaterTilemap.GetTile(pos);
+
+        if (height < limitToUse && currentWaterTile == Water)
+        {
+            decorTilemap.SetTile(pos, tileToPut);
+        }
+    }
+
+
     private void ApplyBaseAutoTile(int x, int y)
     {
         Tile tile = CheckGrassWaterCorners(new Vector2Int(x, y));
 
         if (tile != null)
-            baseTilemap.SetTile(new Vector3Int(x, y), tile);
+            baseWaterTilemap.SetTile(new Vector3Int(x, y), tile);
     }
 
     private Tile GetCorrespondingBaseTile(float noiseValue)
@@ -153,15 +254,17 @@ public class TilemapGenerator : MonoBehaviour
     // ---------------- WATER CHECK ----------------
     private bool IsWater(int x, int y)
     {
-        return baseTilemap.GetTile(new Vector3Int(x, y)) != Grass;
-    }
+        if (x < 0 || x >= widthX || y < 0 || y >= heightY)
+            return true;
 
+        return baseWaterTilemap.GetTile(new Vector3Int(x, y)) != null;
+    }
     // ---------------- WATER/GRASS AUTOTILE ----------------
     private Tile CheckGrassWaterCorners(Vector2Int pos)
     {
-        TileBase current = baseTilemap.GetTile(new Vector3Int(pos.x, pos.y));
+        TileBase current = baseWaterTilemap.GetTile(new Vector3Int(pos.x, pos.y));
 
-        if (current == Grass)
+        if (current == null)
             return null;
 
         bool n = !IsWater(pos.x, pos.y + 1);
@@ -197,7 +300,7 @@ public class TilemapGenerator : MonoBehaviour
             0b1010 => grassCornerTiles[7],
 
             0 => Water,
-            _ => Grass
+            _ => null,
         };
     }
 
@@ -254,4 +357,90 @@ public class TilemapGenerator : MonoBehaviour
 
         return biomeSnapshot[x, y] == Forest;
     }
+
+
+
+
+    //BUILDLIDNgGS
+
+
+
+    private void GenerateVillage()
+    {
+        for (int i = buildingsTilemap.transform.childCount - 1; i >= 0; i--)
+            DestroyImmediate(buildingsTilemap.transform.GetChild(i).gameObject);
+
+        placedTentPositions.Clear();
+
+        for (int i = 0; i < numberTentVillage; i++)
+        {
+            bool findVillageSpot = false;
+            Vector3Int randPos = Vector3Int.zero;
+
+            int maxAttempts = 1000;
+            float currentMaxDistance = maxTentDistance;
+
+            while (!findVillageSpot && maxAttempts-- > 0)
+            {
+                // Every 200 failed attempts, relax the max distance
+                if (maxAttempts % 200 == 0 && currentMaxDistance < widthX)
+                    currentMaxDistance *= 1.5f;
+
+                randPos = new Vector3Int(Random.Range(0, widthX), Random.Range(0, heightY));
+                findVillageSpot = CheckPlaceForTent(randPos, currentMaxDistance);
+            }
+
+            if (findVillageSpot)
+            {
+                placedTentPositions.Add(randPos);
+                SetupTent(randPos);
+            }
+            else
+            {
+                Debug.LogWarning($"Could not place tent {i + 1}/{numberTentVillage} after max attempts.");
+            }
+        }
+    }
+
+
+
+    private bool CheckPlaceForTent(Vector3Int basePose, float currentMaxDistance)
+    {
+        Vector3Int randPos2 = new Vector3Int(basePose.x - 1, basePose.y);
+        Vector3Int randPos3 = new Vector3Int(basePose.x - 1, basePose.y +1);
+        Vector3Int randPos4 = new Vector3Int(basePose.x, basePose.y + 1);
+
+        // grass check
+        if (baseTilemap.GetTile(basePose) == null || baseTilemap.GetTile(randPos2) == null ||
+            baseTilemap.GetTile(randPos3) == null || baseTilemap.GetTile(randPos4) == null)
+            return false;
+
+        // Biome must be null
+        if (biomeTilemap.GetTile(basePose) != null || biomeTilemap.GetTile(randPos2) != null ||
+            biomeTilemap.GetTile(randPos3) != null || biomeTilemap.GetTile(randPos4) != null)
+            return false;
+
+        if (baseWaterTilemap.GetTile(basePose) != null || baseWaterTilemap.GetTile(randPos2) != null ||
+            baseWaterTilemap.GetTile(randPos3) != null || baseWaterTilemap.GetTile(randPos4) != null)
+            return false;
+
+
+        foreach (Vector3Int placed in placedTentPositions)
+        {
+            float dist = Vector3Int.Distance(basePose, placed);
+            if (dist == 0 || dist < minTentDistance || dist > currentMaxDistance)
+                return false;
+        }
+
+        return true;
+    }
+
+    private void SetupTent(Vector3Int pos)
+    {
+        int RandomTent = Random.Range(0, TentsVillage.Length);
+        Vector3 worldPos = new Vector3(pos.x + 0.5f, pos.y + 0.5f, 0);
+        Instantiate(TentsVillage[RandomTent], worldPos, Quaternion.identity, buildingsTilemap.transform);
+    }
+
+
 }
