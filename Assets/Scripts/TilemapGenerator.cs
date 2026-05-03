@@ -8,7 +8,7 @@ public class TilemapGenerator : MonoBehaviour
 {
     [SerializeField] SONoiseSettings noiseSettings;
     [SerializeField] SONoiseSettings treeNoiseSettings;
-
+    [SerializeField] GameObject PlayerSpawnPoint;
     public int widthX = 80;
     public int heightY = 40;
     public int seed;
@@ -18,6 +18,7 @@ public class TilemapGenerator : MonoBehaviour
     public int numberTentVillage = 3;
     public float minTentDistance = 5f;
     public float maxTentDistance = 15f;
+    public float villageDecorRadius = 10f;
 
     [Header("Tilemap")]
 
@@ -36,6 +37,7 @@ public class TilemapGenerator : MonoBehaviour
     public Tile[] WaterDecor;
     public Tile[] ForestDecor;
     public GameObject[] TentsVillage;
+    public Tile[] DecorVillage;
 
 
     public Tile[] grassCornerTiles;
@@ -92,6 +94,11 @@ public class TilemapGenerator : MonoBehaviour
 
 
         GenerateVillage();
+
+        PlacePlayerSpawnPoint();
+
+        GenerateVillageDecor();
+
     }
 
     private void GenerateBaseTilemap()
@@ -400,6 +407,8 @@ public class TilemapGenerator : MonoBehaviour
                 Debug.LogWarning($"Could not place tent {i + 1}/{numberTentVillage} after max attempts.");
             }
         }
+
+
     }
 
 
@@ -443,4 +452,90 @@ public class TilemapGenerator : MonoBehaviour
     }
 
 
+    private void GenerateVillageDecor()
+    {
+        if (placedTentPositions.Count == 0) return;
+
+        int radius = Mathf.RoundToInt(villageDecorRadius);
+
+        for (int i = 0; i < DecorVillage.Length; i++)
+        {
+            // Pick a random tent for each decor piece
+            Vector3Int tentPos = placedTentPositions[Random.Range(0, placedTentPositions.Count)];
+
+            List<Vector3Int> validPositions = new List<Vector3Int>();
+
+            for (int x = tentPos.x - radius; x <= tentPos.x + radius; x++)
+            {
+                for (int y = tentPos.y - radius; y <= tentPos.y + radius; y++)
+                {
+                    Vector3Int pos = new Vector3Int(x, y);
+
+                    if (x < 0 || x >= widthX || y < 0 || y >= heightY) continue;
+                    if (Vector3Int.Distance(pos, tentPos) > radius) continue;
+                    if (baseTilemap.GetTile(pos) == null) continue;
+                    if (baseWaterTilemap.GetTile(pos) != null) continue;
+                    if (biomeTilemap.GetTile(pos) != null) continue;
+                    if (decorTilemap.GetTile(pos) != null) continue;
+
+                    validPositions.Add(pos);
+                }
+            }
+
+            if (validPositions.Count == 0)
+            {
+                Debug.LogWarning($"No valid spot for village decor {i}.");
+                continue;
+            }
+
+            Vector3Int chosen = validPositions[Random.Range(0, validPositions.Count)];
+            decorTilemap.SetTile(chosen, DecorVillage[i]);
+        }
+    }
+
+
+    private void PlacePlayerSpawnPoint()
+    {
+        if (placedTentPositions.Count == 0) return;
+
+        Vector3 center = Vector3.zero;
+        foreach (Vector3Int tent in placedTentPositions)
+            center += new Vector3(tent.x + 0.5f, tent.y + 0.5f, 0);
+        center /= placedTentPositions.Count;
+
+        int maxAttempts = 500;
+        float searchRadius = 1f;
+
+        while (maxAttempts-- > 0)
+        {
+            if (maxAttempts % 100 == 0) searchRadius += 1f;
+
+            int x = Mathf.RoundToInt(center.x + Random.Range(-searchRadius, searchRadius));
+            int y = Mathf.RoundToInt(center.y + Random.Range(-searchRadius, searchRadius));
+
+            Vector3Int checkPos = new Vector3Int(x, y);
+
+            if (x < 0 || x >= widthX || y < 0 || y >= heightY) continue;
+            if (baseTilemap.GetTile(checkPos) == null) continue;
+            if (baseWaterTilemap.GetTile(checkPos) != null) continue;
+            if (biomeTilemap.GetTile(checkPos) != null) continue;
+
+            // Make sure it's not on top of a tent
+            bool onTent = false;
+            foreach (Vector3Int tent in placedTentPositions)
+            {
+                if (Vector3Int.Distance(checkPos, tent) < 2f)
+                {
+                    onTent = true;
+                    break;
+                }
+            }
+            if (onTent) continue;
+
+            PlayerSpawnPoint.transform.position = new Vector3(x + 0.5f, y + 0.5f, 0);
+            return;
+        }
+
+        Debug.LogWarning("Could not find a valid player spawn point.");
+    }
 }
