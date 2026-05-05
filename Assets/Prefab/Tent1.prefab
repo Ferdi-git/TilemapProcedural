@@ -261,7 +261,7 @@ SpriteRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 6
+  m_SortingOrder: 5
   m_MaskInteraction: 0
   m_Sprite: {fileID: 4688716454337803803, guid: 4a85bfb91e3186f4ebd93b3728b6985c, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -374,6 +374,7 @@ GameObject:
   m_Component:
   - component: {fileID: 6746338623968412376}
   - component: {fileID: 9179454472718623082}
+  - component: {fileID: 7309238489912941412}
   m_Layer: 0
   m_Name: Tent1
   m_TagString: Untagged
@@ -446,3 +447,15 @@ BoxCollider2D:
   m_AutoTiling: 0
   m_Size: {x: 2, y: 1.166008}
   m_EdgeRadius: 0
+--- !u!114 &7309238489912941412
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7680503274220992109}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8b8f0e4158aed24cb48734fda1f34c4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: '::'

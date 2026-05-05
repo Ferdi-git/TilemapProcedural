@@ -12,10 +12,17 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        Vector2 moveVector = Vector2.zero;
-        float xInput = Input.GetAxis("Horizontal");
-        float yInput = Input.GetAxis("Vertical");
-        moveVector = new Vector2(xInput, yInput).normalized * speed;
-        rb.linearVelocity = moveVector;
+        float xInput = Input.GetAxisRaw("Horizontal");
+        float yInput = Input.GetAxisRaw("Vertical");
+
+        if (xInput == 0 && yInput == 0)
+        {
+            rb.linearVelocity = Vector2.zero;
+        }
+        else
+        {
+            Vector2 moveVector = new Vector2(xInput, yInput).normalized * speed;
+            rb.linearVelocity = moveVector;
+        }
     }
 }

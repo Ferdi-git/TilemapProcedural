@@ -22,30 +22,19 @@ public class TilemapGenerator : MonoBehaviour
 
     [Header("Tilemap")]
 
-    public Tilemap baseTilemap;
-    public Tilemap baseWaterTilemap;
-    public Tilemap biomeTilemap;
-    public Tilemap decorTilemap;
-    public Tilemap buildingsTilemap;
+    public Tilemap baseTilemap,baseWaterTilemap,biomeTilemap,decorTilemap,buildingsTilemap;
 
-    public Tile Grass;
-    public Tile Water;
-    public Tile Forest;
-    public Tile[] UpTree;
-    public Tile[] DownTree;
-    public Tile[] GrassFlowers;
-    public Tile[] WaterDecor;
-    public Tile[] ForestDecor;
+    public Tile Grass,Water,Forest;
+    public Tile[] UpTree, DownTree , GrassFlowers, WaterDecor, ForestDecor, DecorVillage;
+
     public GameObject[] TentsVillage;
-    public Tile[] DecorVillage;
 
 
-    public Tile[] grassCornerTiles;
-    public Tile[] forestCornerTiles;
+    public Tile[] grassCornerTiles, forestCornerTiles;
 
-    public Tile[] grassTiles;
-    public Tile[] waterTiles;
+    public Tile[] grassTiles,waterTiles;
 
+    public GameObject[] Trees;
 
     [Header("Limits")]
 
@@ -66,9 +55,16 @@ public class TilemapGenerator : MonoBehaviour
 
     private void OnValidate()
     {
-        Generate();
+        //Generate();
     }
 
+    private void Start()
+    {
+        for (int i = buildingsTilemap.transform.childCount - 1; i >= 0; i--)
+            DestroyImmediate(buildingsTilemap.transform.GetChild(i).gameObject);
+        Generate();
+
+    }
 
     [Button]
     public void Generate()
@@ -174,7 +170,7 @@ public class TilemapGenerator : MonoBehaviour
 
                 for (int i = 0; limitTrees.Length > i; i++)
                 {
-                    SetTrees(height, UpTree[i], DownTree[i], limitTrees[i], basePos);
+                    SetTrees(height, UpTree[i], DownTree[i], limitTrees[i], basePos, Trees[i]);
 
                 }
 
@@ -197,12 +193,17 @@ public class TilemapGenerator : MonoBehaviour
     }
 
 
-    private void SetTrees(float height, Tile tileToPutUp, Tile tileToPutDown, float limitToUse, Vector3Int pos)
+    private void SetTrees(float height, Tile tileToPutUp, Tile tileToPutDown, float limitToUse, Vector3Int pos, GameObject Tree)
     {  
         if (height < limitToUse && decorTilemap.GetTile(pos) == null && decorTilemap.GetTile(new Vector3Int(pos.x, pos.y + 1)) == null && (!forestCornerTiles.Contains(biomeTilemap.GetTile(pos)) && biomeTilemap.GetTile(pos) == Forest))
         {
             decorTilemap.SetTile(new Vector3Int(pos.x, pos.y + 1), tileToPutUp);
+
+
             decorTilemap.SetTile(pos, tileToPutDown);
+
+            Vector3 worldPos = decorTilemap.GetCellCenterWorld(pos);
+            Instantiate(Tree, worldPos, Quaternion.identity);
         }
     }
 
@@ -374,8 +375,6 @@ public class TilemapGenerator : MonoBehaviour
 
     private void GenerateVillage()
     {
-        for (int i = buildingsTilemap.transform.childCount - 1; i >= 0; i--)
-            DestroyImmediate(buildingsTilemap.transform.GetChild(i).gameObject);
 
         placedTentPositions.Clear();
 
